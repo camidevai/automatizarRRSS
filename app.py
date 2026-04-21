@@ -10,6 +10,7 @@ app = Flask(__name__)
 
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
+INSTAGRAM_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 INSTAGRAM_ACCOUNT_ID = os.getenv("INSTAGRAM_ACCOUNT_ID")
 
 
@@ -24,7 +25,6 @@ def verify_webhook():
     token = request.args.get("hub.verify_token")
     challenge = request.args.get("hub.challenge")
 
-    print(f"🔍 mode={mode} | token_recibido={token} | VERIFY_TOKEN={VERIFY_TOKEN}")
     if mode == "subscribe" and token == VERIFY_TOKEN:
         print("✅ Webhook verificado por Meta")
         return challenge, 200
@@ -34,13 +34,17 @@ def verify_webhook():
 @app.route("/webhook", methods=["POST"])
 def handle_webhook():
     data = request.get_json()
+    print(f"📥 Evento recibido: {json.dumps(data)[:200]}")
 
     if data.get("object") == "instagram":
         for entry in data.get("entry", []):
             for change in entry.get("changes", []):
-                if change.get("field") == "comments":
-                    comment_data = change.get("value", {})
-                    handle_comment(comment_data)
+                field = change.get("field")
+                value = change.get("value", {})
+                if field == "comments":
+                    handle_comment(value)
+                elif field == "messages":
+                    handle_message(value)
 
     return "OK", 200
 
@@ -50,7 +54,7 @@ def handle_comment(comment_data):
     comment_id = comment_data.get("id")
     commenter_id = comment_data.get("from", {}).get("id")
 
-    print(f"💬 Comentario recibido: '{comment_text}'")
+    print(f"💬 Comentario: '{comment_text}' de {commenter_id}")
 
     keywords = load_keywords()
 
@@ -62,15 +66,19 @@ def handle_comment(comment_data):
             break
 
 
+def handle_message(message_data):
+    print(f"📨 Mensaje recibido: {message_data}")
+
+
 def reply_to_comment(comment_id, message):
     url = f"https://graph.facebook.com/v19.0/{comment_id}/replies"
     payload = {
         "message": message,
-        "access_token": PAGE_ACCESS_TOKEN
+        "access_token": INSTAGRAM_ACCESS_TOKEN
     }
     response = requests.post(url, data=payload)
     result = response.json()
-    print(f"📩 Respuesta a comentario: {result}")
+    print(f"📩 Respuesta comentario: {result}")
     return result
 
 
@@ -79,7 +87,7 @@ def send_dm(user_id, message):
     payload = {
         "recipient": {"id": user_id},
         "message": {"text": message},
-        "access_token": PAGE_ACCESS_TOKEN
+        "access_token": INSTAGRAM_ACCESS_TOKEN
     }
     response = requests.post(url, json=payload)
     result = response.json()

@@ -88,5 +88,6 @@ def send_dm(user_id, message):
 
 
 if __name__ == "__main__":
-    print("🚀 Servidor iniciado en http://localhost:5000")
-    app.run(port=5000, debug=True)
+    port = int(os.getenv("PORT", 5000))
+    print(f"🚀 Servidor iniciado en puerto {port}")
+    app.run(host="0.0.0.0", port=port, debug=False)
